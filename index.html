@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sudoku</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#e8edf1;--panel:#f8fafb;--ink:#1b2a39;--mute:#6b7c8c;--line:#9fb0bf;--thick:#1b2a39;--user:#2457c5;--teal:#1f6f78;--gold:#f2b705;--err:#d64545;--sel:#cfe6ea;--peer:#e3eef0;--same:#bcd9df;--diag:#eef3e4}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--ink);font-family:'Bricolage Grotesque',system-ui,sans-serif;display:flex;justify-content:center;padding:16px}
+.app{width:100%;max-width:480px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+h1{margin:0;font-size:28px;font-weight:800;letter-spacing:-.5px}
+.icon{border:0;background:var(--panel);width:40px;height:40px;border-radius:50%;font-size:18px;cursor:pointer;box-shadow:0 1px 0 var(--line)}
+.row{display:flex;gap:6px;margin-bottom:8px}
+.seg{flex:1;display:flex;background:var(--panel);border-radius:10px;padding:3px;box-shadow:0 1px 0 var(--line)}
+.seg button{flex:1;border:0;background:none;font:inherit;font-size:14px;padding:8px 0;border-radius:8px;cursor:pointer;color:var(--mute)}
+.seg button.on{background:var(--teal);color:#fff;font-weight:600}
+.stats{display:flex;justify-content:space-between;font-size:14px;color:var(--mute);margin:10px 2px}
+.stats b{color:var(--ink)}
+#board{display:grid;grid-template-columns:repeat(9,1fr);aspect-ratio:1;background:var(--panel);border:3px solid var(--thick);border-radius:6px;position:relative;user-select:none}
+.cell{position:relative;display:flex;align-items:center;justify-content:center;font-size:clamp(20px,6.4vw,30px);border-right:1px solid var(--line);border-bottom:1px solid var(--line);cursor:pointer;font-weight:600;transition:background .12s}
+.cell:nth-child(9n){border-right:0}
+.cell:nth-child(n+73){border-bottom:0}
+.cell:nth-child(3n):not(:nth-child(9n)){border-right:3px solid var(--thick)}
+.cell:nth-child(n+19):nth-child(-n+27),.cell:nth-child(n+46):nth-child(-n+54){border-bottom:3px solid var(--thick)}
+.cell.diag{background:var(--diag)}
+.cell.peer{background:var(--peer)}
+.cell.same{background:var(--same)}
+.cell.sel{background:var(--sel);box-shadow:inset 0 0 0 3px var(--teal)}
+.cell.given{color:var(--ink);font-weight:800}
+.cell.user{color:var(--user)}
+.cell.hint{color:#8a6500}
+.cell.err{color:var(--err);background:#fbe3e3}
+.notes{position:absolute;inset:1px;display:grid;grid-template-columns:repeat(3,1fr);font-size:clamp(8px,2.3vw,11px);color:var(--mute);font-weight:400;line-height:1}
+.notes i{display:flex;align-items:center;justify-content:center;font-style:normal}
+.cell.pop{animation:pop .25s}
+.cell.shake{animation:shake .35s}
+.cell.hinted{animation:glow 1.3s ease-out}
+@keyframes pop{0%{transform:scale(.6)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+@keyframes glow{0%{box-shadow:0 0 0 0 rgba(242,183,5,.9);background:#ffe58a;transform:scale(1.25)}40%{box-shadow:0 0 0 14px rgba(242,183,5,.35);background:#ffe58a;transform:scale(1)}100%{box-shadow:0 0 0 26px rgba(242,183,5,0)}}
+.spark{position:absolute;width:6px;height:6px;border-radius:50%;background:var(--gold);pointer-events:none;z-index:5;animation:fly .8s ease-out forwards}
+@keyframes fly{to{transform:translate(var(--dx),var(--dy)) scale(0);opacity:0}}
+.tools{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 8px}
+.tool{border:0;background:var(--panel);border-radius:12px;padding:10px 0;font:inherit;font-size:13px;color:var(--ink);cursor:pointer;box-shadow:0 1px 0 var(--line)}
+.tool span{display:block;font-size:20px}
+.tool.on{background:var(--teal);color:#fff}
+.tool.hintbtn{background:var(--gold);font-weight:600}
+.tool:disabled{opacity:.45;cursor:default}
+.pad{display:grid;grid-template-columns:repeat(9,1fr);gap:5px}
+.pad button{border:0;background:var(--panel);border-radius:10px;padding:8px 0 4px;font:inherit;font-size:clamp(20px,6vw,28px);font-weight:600;color:var(--user);cursor:pointer;box-shadow:0 1px 0 var(--line)}
+.pad button small{display:block;font-size:10px;color:var(--mute);font-weight:400}
+.pad button:active{transform:translateY(1px)}
+.pad button.done{opacity:.25;pointer-events:none}
+.overlay{position:fixed;inset:0;background:rgba(27,42,57,.65);display:none;align-items:center;justify-content:center;z-index:20;padding:20px}
+.overlay.show{display:flex}
+.card{background:var(--panel);border-radius:16px;padding:28px;text-align:center;max-width:320px;width:100%}
+.card h2{margin:0 0 6px;font-size:26px}
+.card p{color:var(--mute);margin:0 0 18px}
+.card button{border:0;background:var(--teal);color:#fff;font:inherit;font-weight:600;padding:12px 22px;border-radius:10px;cursor:pointer}
+.conf{position:fixed;top:-10px;width:8px;height:12px;z-index:30;animation:fall linear forwards}
+@keyframes fall{to{transform:translateY(105vh) rotate(720deg)}}
+:focus-visible{outline:3px solid var(--user);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Sudoku</h1>
+    <button class="icon" id="sound" title="Sound on/off" aria-label="Toggle sound">🔊</button>
+  </header>
+
+  <div class="row"><div class="seg" id="levels" aria-label="Difficulty">
+    <button data-v="easy" class="on">Easy</button><button data-v="medium">Medium</button><button data-v="hard">Hard</button><button data-v="expert">Expert</button>
+  </div></div>
+  <div class="row"><div class="seg" id="modes" aria-label="Puzzle type">
+    <button data-v="classic" class="on">Classic</button><button data-v="diagonal">Diagonal</button><button data-v="even">Even-Odd</button>
+  </div></div>
+
+  <div class="stats">
+    <span>Time <b id="time">0:00</b></span>
+    <span>Mistakes <b id="miss">0/3</b></span>
+    <span>Hints <b id="hints">3</b></span>
+  </div>
+
+  <div id="board" role="grid" aria-label="Sudoku board"></div>
+
+  <div class="tools">
+    <button class="tool" id="undo"><span>↩</span>Undo</button>
+    <button class="tool" id="erase"><span>⌫</span>Erase</button>
+    <button class="tool" id="notes"><span>✎</span>Notes: off</button>
+    <button class="tool hintbtn" id="hint"><span>💡</span>Hint</button>
+  </div>
+  <div class="pad" id="pad"></div>
+  <div class="tools" style="grid-template-columns:1fr"><button class="tool" id="new">New game</button></div>
+</div>
+
+<div class="overlay" id="ov"><div class="card"><h2 id="ovt"></h2><p id="ovp"></p><button id="ovb">Play again</button></div></div>
+
+<script>
+(()=>{
+const $=s=>document.querySelector(s);
+const GIVENS={easy:40,medium:32,hard:27,expert:23};
+let mode='classic',level='easy';
+let peers=[],diagCells=new Set(),evenCells=new Set();
+let sol=[],given=[],vals=[],notes=[],hist=[],sel=-1,noteMode=false,mistakes=0,hints=3,secs=0,timer=null,over=false;
+
+/* ---------- Sound ---------- */
+let ac=null,soundOn=true;
+function audio(){if(!ac){try{ac=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(ac&&ac.state==='suspended')ac.resume();return ac}
+function tone(f,d=.12,type='sine',v=.15,at=0){if(!soundOn)return;const a=audio();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t=a.currentTime+at;o.type=type;o.frequency.setValueAtTime(f,t);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g).connect(a.destination);o.start(t);o.stop(t+d)}
+const sfx={
+ click:()=>tone(520,.05,'triangle',.08),
+ place:()=>{tone(660,.09,'triangle',.15);tone(880,.1,'triangle',.1,.05)},
+ note:()=>tone(900,.04,'square',.04),
+ erase:()=>tone(300,.08,'triangle',.1),
+ wrong:()=>{tone(180,.25,'sawtooth',.12);tone(140,.3,'sawtooth',.1,.08)},
+ hint:()=>[784,988,1318,1568].forEach((f,i)=>tone(f,.25,'sine',.13,i*.07)),
+ done:()=>[523,659,784].forEach((f,i)=>tone(f,.15,'triangle',.12,i*.06)),
+ win:()=>[523,659,784,1047,784,1047,1319].forEach((f,i)=>tone(f,.28,'triangle',.15,i*.12)),
+ lose:()=>[392,330,262,196].forEach((f,i)=>tone(f,.35,'sawtooth',.1,i*.18))
+};
+
+/* ---------- Rules / peers ---------- */
+function buildPeers(){
+  const units=[];
+  for(let r=0;r<9;r++){units.push([...Array(9)].map((_,c)=>r*9+c));}
+  for(let c=0;c<9;c++){units.push([...Array(9)].map((_,r)=>r*9+c));}
+  for(let b=0;b<9;b++){const br=Math.floor(b/3)*3,bc=(b%3)*3,u=[];for(let i=0;i<3;i++)for(let j=0;j<3;j++)u.push((br+i)*9+bc+j);units.push(u)}
+  diagCells=new Set();
+  if(mode==='diagonal'){const d1=[],d2=[];for(let i=0;i<9;i++){d1.push(i*9+i);d2.push(i*9+8-i)}units.push(d1,d2);d1.concat(d2).forEach(x=>diagCells.add(x))}
+  peers=[...Array(81)].map(()=>new Set());
+  units.forEach(u=>u.forEach(a=>u.forEach(b=>{if(a!==b)peers[a].add(b)})));
+  peers=peers.map(s=>[...s]);
+}
+function cands(g,i){let used=0;for(const p of peers[i])if(g[p])used|=1<<g[p];const out=[];for(let v=1;v<=9;v++)if(!(used&(1<<v))&&allowed(i,v))out.push(v);return out}
+let allowed=(i,v)=>mode!=='even'||!evenCells.has(i)||v%2===0;
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a}
+function solve(g,limit,rand){
+  let count=0,res=null;
+  (function rec(){
+    let best=-1,bc=null,bn=10;
+    for(let i=0;i<81;i++)if(!g[i]){const c=cands(g,i);if(c.length<bn){bn=c.length;best=i;bc=c;if(!bn)return}}
+    if(best<0){count++;if(!res)res=g.slice();return}
+    if(rand)shuffle(bc);
+    for(const v of bc){g[best]=v;rec();if(count>=limit){g[best]=0;return}}
+    g[best]=0;
+  })();
+  return {count,res};
+}
+
+/* ---------- Even-Odd: marked cells (shaded) must hold even numbers ---------- */
+function pickEven(){evenCells=new Set();if(mode!=='even')return;sol.forEach((v,i)=>{if(v%2===0&&Math.random()<.55)evenCells.add(i)})}
+
+/* ---------- Generate ---------- */
+function generate(){
+  buildPeers();
+  evenCells=new Set();
+  let full=solve(Array(81).fill(0),1,true).res;
+  sol=full;
+  pickEven();
+  // enforce even-cell constraint in solver for uniqueness
+  const g=sol.slice(),order=shuffle([...Array(81).keys()]);
+  let filled=81;
+  for(const i of order){
+    if(filled<=GIVENS[level])break;
+    const keep=g[i];g[i]=0;
+    if(solve(g.slice(),2,false).count!==1)g[i]=keep;else filled--;
+  }
+  given=g.map(v=>v>0);vals=g.slice();notes=Array(81).fill(0);hist=[];
+}
+
+/* ---------- Render ---------- */
+const board=$('#board');
+for(let i=0;i<81;i++){const d=document.createElement('div');d.className='cell';d.setAttribute('role','gridcell');d.onclick=()=>select(i);board.appendChild(d)}
+const cells=[...board.children];
+const pad=$('#pad');
+for(let n=1;n<=9;n++){const b=document.createElement('button');b.dataset.n=n;b.innerHTML=n+'<small></small>';b.onclick=()=>enter(n);pad.appendChild(b)}
+
+function render(){
+  const sv=sel>=0?vals[sel]:0;
+  cells.forEach((c,i)=>{
+    const v=vals[i];
+    let cls='cell';
+    if(diagCells.has(i))cls+=' diag';
+    if(mode==='even'&&evenCells.has(i))cls+=' evenmark';
+    if(sel>=0&&i!==sel&&peers[sel].includes(i))cls+=' peer';
+    if(sv&&v===sv&&i!==sel)cls+=' same';
+    if(i===sel)cls+=' sel';
+    if(given[i])cls+=' given';else if(v){cls+=' user';if(v!==sol[i])cls+=' err'}
+    c.className=cls;
+    if(mode==='even'&&evenCells.has(i)&&!(i===sel)&&!(sv&&v===sv))c.style.background='#dfe7ee';else c.style.background='';
+    if(v)c.textContent=v;
+    else if(notes[i]){c.innerHTML='<div class="notes">'+[1,2,3,4,5,6,7,8,9].map(n=>'<i>'+(notes[i]&(1<<n)?n:'')+'</i>').join('')+'</div>'}
+    else c.textContent='';
+  });
+  const cnt=Array(10).fill(0);vals.forEach((v,i)=>{if(v&&v===sol[i])cnt[v]++});
+  pad.querySelectorAll('button').forEach(b=>{const n=+b.dataset.n;b.classList.toggle('done',cnt[n]>=9);b.querySelector('small').textContent=Math.max(0,9-cnt[n])});
+  $('#miss').textContent=mistakes+'/3';$('#hints').textContent=hints;$('#hint').disabled=hints<=0;
+  $('#notes').innerHTML='<span>✎</span>Notes: '+(noteMode?'on':'off');$('#notes').classList.toggle('on',noteMode);
+}
+function anim(i,cls){const c=cells[i];c.classList.remove(cls);void c.offsetWidth;c.classList.add(cls)}
+
+/* ---------- Actions ---------- */
+function select(i){sel=i;sfx.click();render()}
+function push(){hist.push({vals:vals.slice(),notes:notes.slice(),mistakes})}
+function clearNotes(i,v){for(const p of peers[i])notes[p]&=~(1<<v)}
+
+function enter(n){
+  if(over||sel<0||given[sel])return;
+  if(vals[sel]===sol[sel])return; // locked once correct
+  if(mode==='even'&&evenCells.has(sel)&&n%2){sfx.wrong();anim(sel,'shake');toast('Shaded cells take even numbers only');return}
+  push();
+  if(noteMode){vals[sel]=0;notes[sel]^=(1<<n);sfx.note();render();return}
+  vals[sel]=n;notes[sel]=0;
+  if(n!==sol[sel]){
+    mistakes++;sfx.wrong();render();anim(sel,'shake');
+    if(mistakes>=3)return end(false);
+    return;
+  }
+  clearNotes(sel,n);sfx.place();render();anim(sel,'pop');
+  checkGroups(sel);
+  if(vals.every((v,i)=>v===sol[i]))end(true);
+}
+function checkGroups(i){
+  const r=Math.floor(i/9),c=i%9;
+  const row=[...Array(9)].map((_,k)=>r*9+k),col=[...Array(9)].map((_,k)=>k*9+c);
+  if(row.every(k=>vals[k]===sol[k])||col.every(k=>vals[k]===sol[k]))setTimeout(sfx.done,120);
+}
+function erase(){
+  if(over||sel<0||given[sel]||vals[sel]===sol[sel])return;
+  push();vals[sel]=0;notes[sel]=0;sfx.erase();render();
+}
+function undo(){
+  const h=hist.pop();if(!h||over)return;
+  vals=h.vals;notes=h.notes;mistakes=h.mistakes;sfx.erase();render();
+}
+function hint(){
+  if(over||hints<=0)return;
+  let t=sel;
+  if(t<0||given[t]||vals[t]===sol[t]){
+    const open=[...Array(81).keys()].filter(i=>vals[i]!==sol[i]);
+    if(!open.length)return;
+    t=open[Math.random()*open.length|0];
+  }
+  push();
+  vals[t]=sol[t];notes[t]=0;clearNotes(t,sol[t]);hints--;sel=t;
+  render();cells[t].classList.add('hint');anim(t,'hinted');sparkle(t);sfx.hint();
+  if(vals.every((v,i)=>v===sol[i]))setTimeout(()=>end(true),700);
+}
+function sparkle(i){
+  const b=board.getBoundingClientRect(),c=cells[i].getBoundingClientRect();
+  const x=c.left-b.left+c.width/2,y=c.top-b.top+c.height/2;
+  for(let k=0;k<14;k++){
+    const s=document.createElement('div'),a=Math.PI*2*k/14,d=30+Math.random()*30;
+    s.className='spark';s.style.left=x-3+'px';s.style.top=y-3+'px';
+    s.style.setProperty('--dx',Math.cos(a)*d+'px');s.style.setProperty('--dy',Math.sin(a)*d+'px');
+    board.appendChild(s);setTimeout(()=>s.remove(),850);
+  }
+}
+function toast(t){const o=$('#hints');o.title=t}
+
+/* ---------- Game flow ---------- */
+const fmt=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+function startTimer(){clearInterval(timer);secs=0;$('#time').textContent='0:00';timer=setInterval(()=>{if(!over){secs++;$('#time').textContent=fmt(secs)}},1000)}
+function newGame(){
+  over=false;sel=-1;mistakes=0;hints=3;noteMode=false;$('#ov').classList.remove('show');
+  $('#board').style.opacity=.4;
+  setTimeout(()=>{generate();$('#board').style.opacity=1;startTimer();render()},30);
+}
+function end(win){
+  over=true;clearInterval(timer);
+  if(win){sfx.win();confetti();$('#ovt').textContent='Solved!';$('#ovp').textContent=level[0].toUpperCase()+level.slice(1)+' '+mode+' puzzle in '+fmt(secs)+' with '+mistakes+' mistake'+(mistakes===1?'':'s')+'.'}
+  else{sfx.lose();$('#ovt').textContent='Out of lives';$('#ovp').textContent='Three mistakes ends the round. Try a fresh puzzle.'}
+  setTimeout(()=>$('#ov').classList.add('show'),win?600:300);
+}
+function confetti(){
+  const cols=['#1f6f78','#f2b705','#2457c5','#d64545','#6bbf8a'];
+  for(let i=0;i<60;i++){const e=document.createElement('div');e.className='conf';e.style.left=Math.random()*100+'vw';e.style.background=cols[i%5];e.style.animationDuration=2+Math.random()*2+'s';e.style.animationDelay=Math.random()*.6+'s';document.body.appendChild(e);setTimeout(()=>e.remove(),5000)}
+}
+
+/* ---------- Wiring ---------- */
+function seg(id,set){$(id).addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;sfx.click();$(id).querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));set(b.dataset.v);newGame()})}
+seg('#levels',v=>level=v);seg('#modes',v=>mode=v);
+$('#undo').onclick=undo;$('#erase').onclick=erase;$('#hint').onclick=hint;$('#new').onclick=()=>{sfx.click();newGame()};$('#ovb').onclick=newGame;
+$('#notes').onclick=()=>{noteMode=!noteMode;sfx.click();render()};
+$('#sound').onclick=()=>{soundOn=!soundOn;$('#sound').textContent=soundOn?'🔊':'🔇';sfx.click()};
+document.addEventListener('keydown',e=>{
+  if(e.key>='1'&&e.key<='9')enter(+e.key);
+  else if(e.key==='Backspace'||e.key==='Delete'||e.key==='0')erase();
+  else if(e.key==='n'||e.key==='N'){noteMode=!noteMode;render()}
+  else if(e.key==='h'||e.key==='H')hint();
+  else if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();undo()}
+  else if(e.key.startsWith('Arrow')){e.preventDefault();if(sel<0)sel=40;else{const d={ArrowUp:-9,ArrowDown:9,ArrowLeft:-1,ArrowRight:1}[e.key],r=Math.floor(sel/9),c=sel%9;if(e.key==='ArrowLeft'&&c>0||e.key==='ArrowRight'&&c<8||e.key==='ArrowUp'&&r>0||e.key==='ArrowDown'&&r<8)sel+=d}render()}
+});
+newGame();
+})();
+</script>
+</body>
+</html>
